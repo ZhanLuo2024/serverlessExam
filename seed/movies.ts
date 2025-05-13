@@ -6,7 +6,7 @@ export const schedules: CinemaSchedule[] = [
   movieId: "f5001",
   movieTitle: "A Minecraft Movie",
   period: "Mar25",
-  city: "Waterford"
+  city: "Waterford" 
 },
 {
   cinemaId: 1001,
