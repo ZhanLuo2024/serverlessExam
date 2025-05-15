@@ -5,42 +5,75 @@ import {
   QueryCommand,
   QueryCommandInput,
 } from "@aws-sdk/lib-dynamodb";
-import schema from "../shared/types.schema.json";
+import { CinemaSchedule } from "../shared/types";
+
 const client = createDDbDocClient();
 
 export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
   try {
-    console.log("Event: ", JSON.stringify(event));
- 
+    console.log("Event:", JSON.stringify(event));
+
+    const cinemaId = Number(event.pathParameters?.cinemaId);
+    if (!cinemaId) {
+      return {
+        statusCode: 400,
+        headers: defaultHeaders(),
+        body: JSON.stringify({ error: "Missing cinemaId in path." }),
+      };
+    }
+
+    const movieId = event.queryStringParameters?.movieId;
+
+    const input: QueryCommandInput = {
+      TableName: "CinemaTable",  
+      KeyConditionExpression: movieId
+        ? "cinemaId = :cid AND movieId = :mid"
+        : "cinemaId = :cid",
+      ExpressionAttributeValues: movieId
+        ? {
+            ":cid": cinemaId,
+            ":mid": movieId,
+          }
+        : {
+            ":cid": cinemaId,
+          },
+    };
+
+    const result = await client.send(new QueryCommand(input));
+    const schedules = result.Items as CinemaSchedule[];
+
     return {
       statusCode: 200,
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({}),
+      headers: defaultHeaders(),
+      body: JSON.stringify(schedules),
     };
   } catch (error: any) {
-    console.log(JSON.stringify(error));
+    console.error("Error:", error);
     return {
       statusCode: 500,
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({ error }),
+      headers: defaultHeaders(),
+      body: JSON.stringify({ error: error.message || "Internal Server Error" }),
     };
   }
 };
 
 function createDDbDocClient() {
   const ddbClient = new DynamoDBClient({ region: process.env.REGION });
-  const marshallOptions = {
-    convertEmptyValues: true,
-    removeUndefinedValues: true,
-    convertClassInstanceToMap: true,
+  return DynamoDBDocumentClient.from(ddbClient, {
+    marshallOptions: {
+      convertEmptyValues: true,
+      removeUndefinedValues: true,
+      convertClassInstanceToMap: true,
+    },
+    unmarshallOptions: {
+      wrapNumbers: false,
+    },
+  });
+}
+
+function defaultHeaders() {
+  return {
+    "content-type": "application/json",
+    "Access-Control-Allow-Origin": "*",
   };
-  const unmarshallOptions = {
-    wrapNumbers: false,
-  };
-  const translateConfig = { marshallOptions, unmarshallOptions };
-  return DynamoDBDocumentClient.from(ddbClient, translateConfig);
 }
