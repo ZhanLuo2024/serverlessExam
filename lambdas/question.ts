@@ -23,21 +23,26 @@ export const handler: APIGatewayProxyHandlerV2 = async (event, context) => {
     }
 
     const movieId = event.queryStringParameters?.movieId;
+    const period = event.queryStringParameters?.period;
 
     const input: QueryCommandInput = {
-      TableName: "CinemaTable",  
-      KeyConditionExpression: movieId
-        ? "cinemaId = :cid AND movieId = :mid"
-        : "cinemaId = :cid",
-      ExpressionAttributeValues: movieId
-        ? {
-            ":cid": cinemaId,
-            ":mid": movieId,
-          }
-        : {
-            ":cid": cinemaId,
-          },
+      TableName: "CinemaTable",
+      KeyConditionExpression: "cinemaId = :cid",
+      ExpressionAttributeValues: {
+        ":cid": cinemaId,
+      },
     };
+
+    if (movieId) {
+      input.KeyConditionExpression += " AND movieId = :mid";
+      input.ExpressionAttributeValues![":mid"] = movieId;
+    }
+
+    if (period) {
+      input.FilterExpression = "#p = :period";
+      input.ExpressionAttributeNames = { "#p": "period" };
+      input.ExpressionAttributeValues![":period"] = period;
+    }
 
     const result = await client.send(new QueryCommand(input));
     const schedules = result.Items as CinemaSchedule[];
